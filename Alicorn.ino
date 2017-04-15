@@ -163,7 +163,7 @@ char* host;
 char* ssid[COUNT_WIFI];
 char* pass[COUNT_WIFI];
 
-// Timer
+// Timers
 os_timer_t timer;
 
 // Structures
@@ -540,7 +540,9 @@ void loadSettings() {
 void connectWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.hostname(host);
-    WiFi.begin(ssid[settings.wifi], pass[settings.wifi]);
+
+    if (settings.wifi < COUNT_WIFI)
+        WiFi.begin(ssid[settings.wifi], pass[settings.wifi]);
     /*
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
@@ -569,8 +571,7 @@ void processTimer(void *pArg) {
         intervals.pull = true;
 
     if (checkInterval(&counters.lcd, INTERVAL_LCD))
-        intervals.lcd = true;    
-        
+        intervals.lcd = true;            
 }
 
 void processRemote() {
@@ -764,12 +765,17 @@ void processLCD() {
                         "Value: " + String(settings.intervalPull / 1000) + " s"
                     );
                     break;
-                case SCREEN_SETT_WIFI:
+                case SCREEN_SETT_WIFI: {
+                    String wifi = "0: DISABLED";
+                    if (settings.wifi < COUNT_WIFI)
+                        wifi = String(settings.wifi + 1) + ": " + ssid[settings.wifi];
+                        
                     drawScreen(
                         "> WiFi Network", 
-                        String(settings.wifi + 1) + ": " + ssid[settings.wifi]
-                    );
-                    break;
+                        wifi
+                    );  
+                    break;                  
+                }                
                 case SCREEN_SETT_TIME:
                     drawScreen(
                         "> Date and Time", 
@@ -810,26 +816,40 @@ void processLCD() {
                     );
                     break;
                 case SCREEN_MAIN_CORE:
-                    drawScreen(
-                        formatNumbers(data.core, COMPACT_LONG, false, true, "RF"), 
-                        formatNumbers(data.gain, COMPACT_SHORT, true, true, "RF/t")
-                    );
+                    if (WiFi.status() != WL_CONNECTED || settings.wifi == COUNT_WIFI)
+                        drawScreen(
+                            "WiFi Unavailable", 
+                            ""
+                        );
+                    else   
+                        drawScreen(
+                            formatNumbers(data.core, COMPACT_LONG, false, true, "RF"), 
+                            formatNumbers(data.gain, COMPACT_SHORT, true, true, "RF/t")
+                        ); 
                     break;
-                case SCREEN_MAIN_BULLETIN: {
-                    String bullA = data.bulletin;
-                    String bullB = "";                    
-                    if (bullA.length() > 16)
-                        bullB = bullA.substring(16);
-                        
-                    drawScreen(
-                        bullA, 
-                        bullB
-                    );
-                    break;                    
-                }
+                case SCREEN_MAIN_BULLETIN:
+                    if (WiFi.status() != WL_CONNECTED || settings.wifi == COUNT_WIFI)
+                        drawScreen(
+                            "WiFi Unavailable", 
+                            ""
+                        );
+                    else {
+                        String bullA = data.bulletin;
+                        String bullB = "";                    
+                        if (bullA.length() > 16)
+                            bullB = bullA.substring(16);
+                            
+                        drawScreen(
+                            bullA, 
+                            bullB
+                        );
+                    }    
+                    break;  
                 case SCREEN_MAIN_WIFI: {
-                    String wifi = "  Disconnected";
-                    if (WiFi.status() == WL_CONNECTED)
+                    String wifi = "  Connecting...";
+                    if (settings.wifi == COUNT_WIFI)
+                        wifi = "  Disabled";
+                    else if (WiFi.status() == WL_CONNECTED)
                         wifi = "  Connected";
                         
                     drawScreen(
@@ -1001,7 +1021,7 @@ void valueDecrease() {
                 break;
             case SCREEN_SETT_WIFI:
                 if (settings.wifi <= 0)
-                    settings.wifi = COUNT_WIFI - 1;
+                    settings.wifi = COUNT_WIFI;
                 else    
                     settings.wifi--;
                 process = true;
@@ -1067,7 +1087,7 @@ void valueIncrease() {
                 process = true;
                 break;
             case SCREEN_SETT_WIFI:
-                if (settings.wifi >= COUNT_WIFI - 1)
+                if (settings.wifi >= COUNT_WIFI)
                     settings.wifi = 0;
                 else    
                     settings.wifi++;
