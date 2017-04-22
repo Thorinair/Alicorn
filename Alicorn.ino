@@ -526,10 +526,10 @@ void saveSettings() {
     EEPROM.write(EEPROM_GAS_SENSOR,       settings.gasSensor);
     EEPROM.write(EEPROM_GEIG_CLICKS,      settings.geigerClicks);
     EEPROM.write(EEPROM_GEIG_ALARM,       settings.geigerAlarm);
-    EEPROM.write(EEPROM_GEIG_SENSITIVITY, settings.geigerSensitivity);
-    EEPROM.write(EEPROM_INT_MEASURE,      settings.intervalMeasure / 1000);
-    EEPROM.write(EEPROM_INT_PUSH,         settings.intervalPush    / 1000);
-    EEPROM.write(EEPROM_INT_PULL,         settings.intervalPull    / 1000);
+    EEPROM.write(EEPROM_GEIG_SENSITIVITY, settings.geigerSensitivity / 100);
+    EEPROM.write(EEPROM_INT_MEASURE,      settings.intervalMeasure   / 1000);
+    EEPROM.write(EEPROM_INT_PUSH,         settings.intervalPush      / 1000);
+    EEPROM.write(EEPROM_INT_PULL,         settings.intervalPull      / 1000);
     EEPROM.write(EEPROM_WIFI,             settings.wifi);
     EEPROM.end();
     Serial.println("Saved settings to EEPROM.");
@@ -542,10 +542,10 @@ void loadSettings() {
     settings.gasSensor         = (bool) EEPROM.read(EEPROM_GAS_SENSOR);
     settings.geigerClicks      = (bool) EEPROM.read(EEPROM_GEIG_CLICKS);
     settings.geigerAlarm       = (bool) EEPROM.read(EEPROM_GEIG_ALARM);
-    settings.geigerSensitivity = (int)  EEPROM.read(EEPROM_GEIG_SENSITIVITY);
-    settings.intervalMeasure   = (int)  EEPROM.read(EEPROM_INT_MEASURE) * 1000;
-    settings.intervalPush      = (int)  EEPROM.read(EEPROM_INT_PUSH)    * 1000;
-    settings.intervalPull      = (int)  EEPROM.read(EEPROM_INT_PULL)    * 1000;
+    settings.geigerSensitivity = (int)  EEPROM.read(EEPROM_GEIG_SENSITIVITY) * 100;
+    settings.intervalMeasure   = (int)  EEPROM.read(EEPROM_INT_MEASURE)      * 1000;
+    settings.intervalPush      = (int)  EEPROM.read(EEPROM_INT_PUSH)         * 1000;
+    settings.intervalPull      = (int)  EEPROM.read(EEPROM_INT_PULL)         * 1000;
     settings.wifi              = (int)  EEPROM.read(EEPROM_WIFI);
     EEPROM.end();
     Serial.println("Loaded settings from EEPROM.");
@@ -632,7 +632,6 @@ void processRemote() {
                         if (settings.lcdBacklight) {
                             states.screenSettings = !states.screenSettings;
                             states.screenPage = 0;
-                            resetLCD();
 
                             if (!states.screenSettings) {
                                 if (states.wifi != settings.wifi)
@@ -647,6 +646,8 @@ void processRemote() {
                                     noTone(PIN_BUZZER); 
                                 }                                
                             } 
+                            
+                            resetLCD();
                             // Serial.println("Settings pressed, now set to " + String(states.screenSettings));
                         }
                         break;
