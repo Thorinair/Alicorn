@@ -18,10 +18,10 @@ extern "C" {
 // Pins
 //#define PIN_BUTTON_FACTORY 0
 #define PIN_RELAY_GEIG     0
-#define PIN_BUZZER_ALARM   2
 #define PIN_DHT            12
+#define PIN_GEIGER         13
 #define PIN_IR             14
-#define PIN_BUZZER_REMOTE  15
+#define PIN_BUZZER         15
 #define PIN_RELAY_GAS      16
 #define PIN_MQ             A0
 //#define PIN_LED            3
@@ -36,30 +36,26 @@ extern "C" {
 #define DEFAULT_REMOTE_BEEPS     1
 #define DEFAULT_GAS_SENSOR       1
 #define DEFAULT_GEIG_CLICKS      1
-#define DEFAULT_GEIG_WARNING     1
-#define DEFAULT_GEIG_SENSITIVITY 10
+#define DEFAULT_GEIG_ALARM       1
+#define DEFAULT_GEIG_SENSITIVITY 1000
 #define DEFAULT_INT_MEASURE      10000
-#define DEFAULT_INT_GEIGER       60000
 #define DEFAULT_INT_PUSH         60000
 #define DEFAULT_INT_PULL         1000
 #define DEFAULT_WIFI             0
 
 // MinMaxStep Settings
-#define MIN_GEIG_SENSITIVITY 10
+#define MIN_GEIG_SENSITIVITY 100
 #define MIN_INT_MEASURE      2000
-#define MIN_INT_GEIGER       60000
 #define MIN_INT_PUSH         1000
 #define MIN_INT_PULL         1000
 
-#define MAX_GEIG_SENSITIVITY 1000
+#define MAX_GEIG_SENSITIVITY 10000
 #define MAX_INT_MEASURE      60000
-#define MAX_INT_GEIGER       3600000
 #define MAX_INT_PUSH         60000
 #define MAX_INT_PULL         60000
 
-#define STP_GEIG_SENSITIVITY 10
+#define STP_GEIG_SENSITIVITY 100
 #define STP_INT_MEASURE      1000
-#define STP_INT_GEIGER       60000
 #define STP_INT_PUSH         1000
 #define STP_INT_PULL         1000
 
@@ -69,17 +65,16 @@ extern "C" {
 #define EEPROM_REMOTE_BEEPS     2
 #define EEPROM_GAS_SENSOR       3
 #define EEPROM_GEIG_CLICKS      4
-#define EEPROM_GEIG_WARNING     5
+#define EEPROM_GEIG_ALARM       5
 #define EEPROM_GEIG_SENSITIVITY 6
 #define EEPROM_INT_MEASURE      7
-#define EEPROM_INT_GEIGER       8
-#define EEPROM_INT_PUSH         9
-#define EEPROM_INT_PULL         10
-#define EEPROM_WIFI             11
+#define EEPROM_INT_PUSH         8
+#define EEPROM_INT_PULL         9
+#define EEPROM_WIFI             10
 
 // Screens
 #define SCREENS_MAIN 7
-#define SCREENS_SETT 11
+#define SCREENS_SETT 10
 
 // Main Screens
 #define SCREEN_MAIN_TIME      0
@@ -94,21 +89,22 @@ extern "C" {
 #define SCREEN_SETT_REMOTE_BEEPS     0
 #define SCREEN_SETT_GAS_SENSOR       1
 #define SCREEN_SETT_GEIG_CLICKS      2
-#define SCREEN_SETT_GEIG_WARNING     3
+#define SCREEN_SETT_GEIG_ALARM       3
 #define SCREEN_SETT_GEIG_SENSITIVITY 4
 #define SCREEN_SETT_INT_MEASURE      5
-#define SCREEN_SETT_INT_GEIGER       6
-#define SCREEN_SETT_INT_PUSH         7
-#define SCREEN_SETT_INT_PULL         8
-#define SCREEN_SETT_WIFI             9
-#define SCREEN_SETT_TIME             10
+#define SCREEN_SETT_INT_PUSH         6
+#define SCREEN_SETT_INT_PULL         7
+#define SCREEN_SETT_WIFI             8
+#define SCREEN_SETT_TIME             9
 
 
 // Intervals
-#define INTERVAL_CYCLE 100
-#define INTERVAL_TIMER 100
-#define INTERVAL_LCD   1000
-#define INTERVAL_CLOCK 1000
+#define INTERVAL_CYCLE  100
+#define INTERVAL_TIMER  100
+#define INTERVAL_ALARM  250
+#define INTERVAL_LCD    1000
+#define INTERVAL_GEIGER 60000
+#define INTERVAL_CLOCK  1000
 
 // Compact Levels
 #define COMPACT_NONE   0
@@ -117,8 +113,9 @@ extern "C" {
 #define COMPACT_SHORT  3
 
 // Buzzer
-#define BUZZER_TONE     3000
-#define BUZZER_DURATION 100
+#define BUZZER_REMOTE_TONE     3000
+#define BUZZER_REMOTE_DURATION 100
+#define BUZZER_ALARM_TONE      2000
 
 // DHT22
 DHT dht(PIN_DHT, DHT22);
@@ -131,6 +128,9 @@ SFE_BMP180 bmp;
 //MQ135 mq(PIN_MQ);
 
 // RTC
+
+// Geiger
+#define DOSE_MULTI 0.0057
 
 // LCD
 LiquidCrystal_I2C lcd(I2C_LCD, 16, 2);
@@ -165,6 +165,7 @@ char* pass[COUNT_WIFI];
 
 // Timers
 os_timer_t timer;
+os_timer_t timerAlarm;
 
 // Structures
 struct SETTINGS {
@@ -172,7 +173,7 @@ struct SETTINGS {
     bool remoteBeeps;
     bool gasSensor;
     bool geigerClicks;
-    bool geigerWarning;
+    bool geigerAlarm;
     int  geigerSensitivity;
     int  intervalMeasure;
     long intervalGeiger;
@@ -184,11 +185,14 @@ struct SETTINGS {
 struct STATES {
     bool screenSettings;
     int  screenPage;
+    bool alarm;
+    bool alarmOn;
     int  wifi;
 } states;
 
 struct COUNTERS {
     int measure;
+    int geiger;
     int cclock;
     int push;
     int pull;
@@ -197,6 +201,7 @@ struct COUNTERS {
 
 struct INTERVALS {
     bool measure;
+    bool geiger;
     bool cclock;
     bool push;
     bool pull;
@@ -208,6 +213,7 @@ struct DATA {
     float  humidity;
     float  pressure;
     float  gas;
+    int    cpmNow;
     int    cpm;
     float  dose;
     long   core;
@@ -231,6 +237,7 @@ void setRelays();
 void drawScreen(String top, String bot);
 bool checkInterval(int *counter, int interval);
 void resetAverage();
+void geigerClick();
 
 // String Manipulation
 String formatNumbers(long number, int compact, bool usePrefix, bool useSuffix, String suffix);
@@ -255,8 +262,10 @@ void connectWiFi();
 
 // Processes
 void processTimer(void *pArg);
+void processAlarm(void *pArg);
 void processRemote();
 void processSensors();
+void processGeiger();
 void processClock();
 void processPush();
 void processPull();
@@ -334,6 +343,10 @@ void resetAverage() {
     average.gas         = 0;
     
     averageCount        = 0;
+}
+
+void geigerClick() {
+    data.cpmNow++;
 }
 
 /* =====================
@@ -438,10 +451,9 @@ void setupSettings() {
         settings.remoteBeeps       = DEFAULT_REMOTE_BEEPS;
         settings.gasSensor         = DEFAULT_GAS_SENSOR;
         settings.geigerClicks      = DEFAULT_GEIG_CLICKS;
-        settings.geigerWarning     = DEFAULT_GEIG_WARNING;
+        settings.geigerAlarm       = DEFAULT_GEIG_ALARM;
         settings.geigerSensitivity = DEFAULT_GEIG_SENSITIVITY;
         settings.intervalMeasure   = DEFAULT_INT_MEASURE;
-        settings.intervalGeiger    = DEFAULT_INT_GEIGER;
         settings.intervalPush      = DEFAULT_INT_PUSH;
         settings.intervalPull      = DEFAULT_INT_PULL;
         settings.wifi              = DEFAULT_WIFI;
@@ -456,6 +468,8 @@ void setupSettings() {
 void setupStates() {
     states.screenSettings = false;
     states.screenPage     = 0;
+    states.alarm          = false;
+    states.alarmOn        = false;
     states.wifi           = settings.wifi;
 }
 
@@ -481,6 +495,10 @@ void setupDevices() {
     //attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_FACTORY), factoryReset, FALLING);
     pinMode(PIN_RELAY_GEIG, OUTPUT);
     pinMode(PIN_RELAY_GAS,  OUTPUT);
+
+    
+    pinMode(PIN_GEIGER, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(PIN_GEIGER), geigerClick, CHANGE);
     
     setRelays();
 }
@@ -492,6 +510,8 @@ void setupClock() {
 void setupTimer() {
     os_timer_setfn(&timer, processTimer, NULL);
     os_timer_arm(&timer, INTERVAL_TIMER, true);
+    os_timer_setfn(&timerAlarm, processAlarm, NULL);
+    os_timer_arm(&timerAlarm, INTERVAL_ALARM, true);
 }
 
 /* ==========
@@ -505,10 +525,9 @@ void saveSettings() {
     EEPROM.write(EEPROM_REMOTE_BEEPS,     settings.remoteBeeps);
     EEPROM.write(EEPROM_GAS_SENSOR,       settings.gasSensor);
     EEPROM.write(EEPROM_GEIG_CLICKS,      settings.geigerClicks);
-    EEPROM.write(EEPROM_GEIG_WARNING,     settings.geigerWarning);
+    EEPROM.write(EEPROM_GEIG_ALARM,       settings.geigerAlarm);
     EEPROM.write(EEPROM_GEIG_SENSITIVITY, settings.geigerSensitivity);
     EEPROM.write(EEPROM_INT_MEASURE,      settings.intervalMeasure / 1000);
-    EEPROM.write(EEPROM_INT_GEIGER,       settings.intervalGeiger  / 60000);
     EEPROM.write(EEPROM_INT_PUSH,         settings.intervalPush    / 1000);
     EEPROM.write(EEPROM_INT_PULL,         settings.intervalPull    / 1000);
     EEPROM.write(EEPROM_WIFI,             settings.wifi);
@@ -522,10 +541,9 @@ void loadSettings() {
     settings.remoteBeeps       = (bool) EEPROM.read(EEPROM_REMOTE_BEEPS);
     settings.gasSensor         = (bool) EEPROM.read(EEPROM_GAS_SENSOR);
     settings.geigerClicks      = (bool) EEPROM.read(EEPROM_GEIG_CLICKS);
-    settings.geigerWarning     = (bool) EEPROM.read(EEPROM_GEIG_WARNING);
+    settings.geigerAlarm       = (bool) EEPROM.read(EEPROM_GEIG_ALARM);
     settings.geigerSensitivity = (int)  EEPROM.read(EEPROM_GEIG_SENSITIVITY);
     settings.intervalMeasure   = (int)  EEPROM.read(EEPROM_INT_MEASURE) * 1000;
-    settings.intervalGeiger    = (long) EEPROM.read(EEPROM_INT_GEIGER)  * 60000;
     settings.intervalPush      = (int)  EEPROM.read(EEPROM_INT_PUSH)    * 1000;
     settings.intervalPull      = (int)  EEPROM.read(EEPROM_INT_PULL)    * 1000;
     settings.wifi              = (int)  EEPROM.read(EEPROM_WIFI);
@@ -560,18 +578,35 @@ void processTimer(void *pArg) {
     //Serial.println("Timer tick!");
     if (checkInterval(&counters.measure, settings.intervalMeasure))
         intervals.measure = true;
-
-    if (checkInterval(&counters.cclock, INTERVAL_CLOCK))
-        intervals.cclock = true;
-
-    if (checkInterval(&counters.push, settings.intervalPush))
-        intervals.push = true;
         
-    if (checkInterval(&counters.pull, settings.intervalPush))
-        intervals.pull = true;
+    if (checkInterval(&counters.geiger,  INTERVAL_GEIGER))
+        intervals.geiger  = true;
 
-    if (checkInterval(&counters.lcd, INTERVAL_LCD))
-        intervals.lcd = true;            
+    if (checkInterval(&counters.cclock,  INTERVAL_CLOCK))
+        intervals.cclock  = true;
+
+    if (checkInterval(&counters.push,    settings.intervalPush))
+        intervals.push    = true;
+        
+    if (checkInterval(&counters.pull,    settings.intervalPush))
+        intervals.pull    = true;
+
+    if (checkInterval(&counters.lcd,     INTERVAL_LCD))
+        intervals.lcd     = true;            
+}
+
+void processAlarm(void *pArg) {
+    //Serial.println("Timer tick!");
+    if (settings.geigerAlarm && states.alarm) {
+        if (states.alarmOn) {
+            noTone(PIN_BUZZER); 
+            states.alarmOn = false; 
+        }
+        else {  
+            tone(PIN_BUZZER, BUZZER_ALARM_TONE);
+            states.alarmOn = true;    
+        }
+    }
 }
 
 void processRemote() {
@@ -598,8 +633,20 @@ void processRemote() {
                             states.screenSettings = !states.screenSettings;
                             states.screenPage = 0;
                             resetLCD();
-                            if (states.wifi != settings.wifi)
-                                ESP.restart();
+
+                            if (!states.screenSettings) {
+                                if (states.wifi != settings.wifi)
+                                    ESP.restart();
+    
+                                if (data.dose >= (float) settings.geigerSensitivity / 1000) {
+                                    states.alarm = true;
+                                }
+                                else {
+                                    states.alarm = false;  
+                                    states.alarmOn = false;
+                                    noTone(PIN_BUZZER); 
+                                }                                
+                            } 
                             // Serial.println("Settings pressed, now set to " + String(states.screenSettings));
                         }
                         break;
@@ -616,7 +663,7 @@ void processRemote() {
                     case IR_S7:       screenSet(7);    break;    
                     case IR_S8:       screenSet(8);    break;    
                     case IR_S9:       screenSet(9);    break; 
-                    case IR_S10:      screenSet(10);   break;
+                    //case IR_S10:      screenSet(10);   break;
                     //case IR_S11:      screenSet(11);   break;
                     case IR_DECREASE: valueDecrease(); break;
                     case IR_INCREASE: valueIncrease(); break;                            
@@ -680,6 +727,24 @@ void processSensors() {
     }
 }
 
+void processGeiger() {
+    if (intervals.geiger) {
+        intervals.geiger = false;
+        data.cpm = data.cpmNow;
+        data.dose = ((float) data.cpm * DOSE_MULTI);
+        data.cpmNow = 0;
+
+        if (data.dose >= (float) settings.geigerSensitivity / 1000) {
+            states.alarm = true;
+        }
+        else {
+            states.alarm = false;  
+            states.alarmOn = false;
+            noTone(PIN_BUZZER); 
+        }
+    }
+}
+
 void processClock() {
     if (intervals.cclock) {
         intervals.cclock = false;
@@ -729,28 +794,22 @@ void processLCD() {
                         "Value: " + boolToOnOff(settings.geigerClicks)
                     );
                     break;
-                case SCREEN_SETT_GEIG_WARNING:
+                case SCREEN_SETT_GEIG_ALARM:
                     drawScreen(
-                        "> Geiger Warning", 
-                        "Value: " + boolToOnOff(settings.geigerWarning)
+                        "> Geiger Alarm", 
+                        "Value: " + boolToOnOff(settings.geigerAlarm)
                     );
                     break;
                 case SCREEN_SETT_GEIG_SENSITIVITY:
                     drawScreen(
                         "> Geiger Sensit.", 
-                        "Value: " + String(settings.geigerSensitivity) + " uSv"
+                        "Value: " + String((float) settings.geigerSensitivity / 1000, 2) + " uSv"
                     );
                     break;
                 case SCREEN_SETT_INT_MEASURE:
                     drawScreen(
                         "> Measure Inter.", 
                         "Value: " + String(settings.intervalMeasure / 1000) + " s"
-                    );
-                    break;
-                case SCREEN_SETT_INT_GEIGER:
-                    drawScreen(
-                        "> Geiger Inter.", 
-                        "Value: " + String(settings.intervalGeiger / 60000) + " min"
                     );
                     break;
                 case SCREEN_SETT_INT_PUSH:
@@ -811,8 +870,8 @@ void processLCD() {
                 }
                 case SCREEN_MAIN_GEIGER:
                     drawScreen(
-                        "CPM:  " + String(data.cpm),
-                        "Dose: " + String(data.dose) + " uSv"
+                        "CPM: " + String(data.cpm) + " [" + String(data.cpmNow) + "]",
+                        "Dos: " + String(data.dose, 2) + " uSv/h"
                     );
                     break;
                 case SCREEN_MAIN_CORE:
@@ -909,6 +968,8 @@ void pushVariPass() {
         varipassWriteFloat(KEY1, ID_PRESSURE,    average.pressure    / averageCount, &result);
         if (settings.gasSensor)
             varipassWriteFloat(KEY1, ID_GAS,     average.gas         / averageCount, &result);
+        varipassWriteInt  (KEY1, ID_CPM,  data.cpm,  &result);
+        varipassWriteFloat(KEY1, ID_DOSE, data.dose, &result);
     }
     resetAverage();
 }
@@ -985,8 +1046,8 @@ void valueDecrease() {
                 setRelays();
                 process = true;
                 break;
-            case SCREEN_SETT_GEIG_WARNING:
-                settings.geigerWarning = !settings.geigerWarning;
+            case SCREEN_SETT_GEIG_ALARM:
+                settings.geigerAlarm = !settings.geigerAlarm;
                 process = true;
                 break;
             case SCREEN_SETT_GEIG_SENSITIVITY:
@@ -999,12 +1060,6 @@ void valueDecrease() {
                 settings.intervalMeasure -= STP_INT_MEASURE;
                 if (settings.intervalMeasure < MIN_INT_MEASURE)
                     settings.intervalMeasure = MIN_INT_MEASURE;
-                process = true;
-                break;
-            case SCREEN_SETT_INT_GEIGER:
-                settings.intervalGeiger -= STP_INT_GEIGER;
-                if (settings.intervalGeiger < MIN_INT_GEIGER)
-                    settings.intervalGeiger = MIN_INT_GEIGER;
                 process = true;
                 break;
             case SCREEN_SETT_INT_PUSH:
@@ -1052,8 +1107,8 @@ void valueIncrease() {
                 setRelays();
                 process = true;
                 break;
-            case SCREEN_SETT_GEIG_WARNING:
-                settings.geigerWarning = !settings.geigerWarning;
+            case SCREEN_SETT_GEIG_ALARM:
+                settings.geigerAlarm = !settings.geigerAlarm;
                 process = true;
                 break;
             case SCREEN_SETT_GEIG_SENSITIVITY:
@@ -1066,12 +1121,6 @@ void valueIncrease() {
                 settings.intervalMeasure += STP_INT_MEASURE;
                 if (settings.intervalMeasure > MAX_INT_MEASURE)
                     settings.intervalMeasure = MAX_INT_MEASURE;
-                process = true;
-                break;
-            case SCREEN_SETT_INT_GEIGER:
-                settings.intervalGeiger += STP_INT_GEIGER;
-                if (settings.intervalGeiger > MAX_INT_GEIGER)
-                    settings.intervalGeiger = MAX_INT_GEIGER;
                 process = true;
                 break;
             case SCREEN_SETT_INT_PUSH:
@@ -1107,7 +1156,7 @@ void valueIncrease() {
 
 void beepRemote() {
     if (settings.remoteBeeps) {
-        tone(PIN_BUZZER_REMOTE, BUZZER_TONE, BUZZER_DURATION);
+        tone(PIN_BUZZER, BUZZER_REMOTE_TONE, BUZZER_REMOTE_DURATION);
     }
 }
   
@@ -1137,6 +1186,7 @@ void loop() {
     
     processRemote();
     processSensors();
+    processGeiger();
     processPush();
     if (settings.lcdBacklight) {
         processPull();
