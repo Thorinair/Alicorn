@@ -42,6 +42,8 @@ extern "C" {
 #define DEFAULT_INT_PUSH         60000
 #define DEFAULT_INT_PULL         1000
 #define DEFAULT_WIFI             0
+#define DEFAULT_SCREEN_MAIN      0
+#define DEFAULT_SCREEN_SETT      0
 
 // MinMaxStep Settings
 #define MIN_GEIG_SENSITIVITY 100
@@ -71,6 +73,8 @@ extern "C" {
 #define EEPROM_INT_PUSH         8
 #define EEPROM_INT_PULL         9
 #define EEPROM_WIFI             10
+#define EEPROM_SCREEN_MAIN      11
+#define EEPROM_SCREEN_SETT      12
 
 // Screens
 #define SCREENS_MAIN 7
@@ -180,11 +184,12 @@ struct SETTINGS {
     int  intervalPush;
     int  intervalPull;
     int  wifi;
+    int  screenMain;
+    int  screenSett;
 } settings;
 
 struct STATES {
     bool screenSettings;
-    int  screenPage;
     bool alarm;
     bool alarmOn;
     int  wifi;
@@ -457,6 +462,8 @@ void setupSettings() {
         settings.intervalPush      = DEFAULT_INT_PUSH;
         settings.intervalPull      = DEFAULT_INT_PULL;
         settings.wifi              = DEFAULT_WIFI;
+        settings.screenMain        = DEFAULT_SCREEN_MAIN;
+        settings.screenSett        = DEFAULT_SCREEN_SETT;
         
         Serial.println("\nCreated new settings. Saving...");
         saveSettings();
@@ -467,7 +474,6 @@ void setupSettings() {
 
 void setupStates() {
     states.screenSettings = false;
-    states.screenPage     = 0;
     states.alarm          = false;
     states.alarmOn        = false;
     states.wifi           = settings.wifi;
@@ -531,6 +537,8 @@ void saveSettings() {
     EEPROM.write(EEPROM_INT_PUSH,         settings.intervalPush      / 1000);
     EEPROM.write(EEPROM_INT_PULL,         settings.intervalPull      / 1000);
     EEPROM.write(EEPROM_WIFI,             settings.wifi);
+    EEPROM.write(EEPROM_SCREEN_MAIN,      settings.screenMain);
+    EEPROM.write(EEPROM_SCREEN_SETT,      settings.screenSett);
     EEPROM.end();
     Serial.println("Saved settings to EEPROM.");
 }
@@ -547,6 +555,8 @@ void loadSettings() {
     settings.intervalPush      = (int)  EEPROM.read(EEPROM_INT_PUSH)         * 1000;
     settings.intervalPull      = (int)  EEPROM.read(EEPROM_INT_PULL)         * 1000;
     settings.wifi              = (int)  EEPROM.read(EEPROM_WIFI);
+    settings.screenMain        = (int)  EEPROM.read(EEPROM_SCREEN_MAIN);
+    settings.screenSett        = (int)  EEPROM.read(EEPROM_SCREEN_SETT);
     EEPROM.end();
     Serial.println("Loaded settings from EEPROM.");
 }
@@ -631,7 +641,6 @@ void processRemote() {
                     case IR_SETTINGS:
                         if (settings.lcdBacklight) {
                             states.screenSettings = !states.screenSettings;
-                            states.screenPage = 0;
 
                             if (!states.screenSettings) {
                                 if (states.wifi != settings.wifi)
@@ -776,7 +785,7 @@ void processLCD() {
         intervals.lcd = false;
         
         if (states.screenSettings) {
-            switch (states.screenPage) {
+            switch (settings.screenSett) {
                 case SCREEN_SETT_REMOTE_BEEPS:
                     drawScreen(
                         "> Remote Beeps", 
@@ -845,7 +854,7 @@ void processLCD() {
             }
         } 
         else {
-            switch (states.screenPage) {
+            switch (settings.screenMain) {
                 case SCREEN_MAIN_TIME:
                     drawScreen(
                         "     00:00      ", 
@@ -928,8 +937,8 @@ void processLCD() {
  * ========== */
 
 void pullVariPass() {
-    if (WiFi.status() == WL_CONNECTED)
-        switch (states.screenPage) {
+    if (WiFi.status() == WL_CONNECTED && !states.screenSettings)
+        switch (settings.screenMain) {
             int result;
             case SCREEN_MAIN_CORE:
                 long value1;
@@ -981,15 +990,19 @@ void pushVariPass() {
 
 void screenPrev() {
     if (settings.lcdBacklight) {
-        if (states.screenPage <= 0) {
-            if (states.screenSettings)
-                states.screenPage = SCREENS_SETT - 1;
-            else    
-                states.screenPage = SCREENS_MAIN - 1;
+        if (states.screenSettings) {
+            if (settings.screenSett <= 0)
+                settings.screenSett = SCREENS_SETT - 1;
+            else
+                settings.screenSett--;            
         }
         else {
-            states.screenPage--;
+            if (settings.screenMain <= 0)
+                settings.screenMain = SCREENS_MAIN - 1;
+            else
+                settings.screenMain--;      
         }
+        saveSettings();
         resetLCD();
         // Serial.println("Prev, screen set to " + String(states.screenPage));
     }
@@ -998,17 +1011,18 @@ void screenPrev() {
 void screenNext() {
     if (settings.lcdBacklight) {
         if (states.screenSettings) {
-            if (states.screenPage >= SCREENS_SETT - 1)
-                states.screenPage = 0;
+            if (settings.screenSett >= SCREENS_SETT - 1)
+                settings.screenSett = 0;
             else
-                states.screenPage++;            
+                settings.screenSett++;            
         }
         else {
-            if (states.screenPage >= SCREENS_MAIN - 1)
-                states.screenPage = 0;
+            if (settings.screenMain >= SCREENS_MAIN - 1)
+                settings.screenMain = 0;
             else
-                states.screenPage++;  
+                settings.screenMain++;  
         } 
+        saveSettings();
         resetLCD();
         // Serial.println("Next, screen set to " + String(states.screenPage));
     }
@@ -1018,12 +1032,13 @@ void screenSet(int page) {
     if (settings.lcdBacklight) {
         if (states.screenSettings) {
             if (page < SCREENS_SETT)
-                states.screenPage = page;  
+                settings.screenSett = page;  
         }
         else {
             if (page < SCREENS_MAIN)
-                states.screenPage = page;
+                settings.screenMain = page;
         } 
+        saveSettings();
         resetLCD();
         // Serial.println("Screen set to " + String(states.screenPage));
     }
@@ -1032,7 +1047,7 @@ void screenSet(int page) {
 void valueDecrease() {
     if (states.screenSettings && settings.lcdBacklight) {
         bool process = false;
-        switch (states.screenPage) {
+        switch (settings.screenSett) {
             case SCREEN_SETT_REMOTE_BEEPS:
                 settings.remoteBeeps = !settings.remoteBeeps;
                 process = true;
@@ -1093,7 +1108,7 @@ void valueDecrease() {
 void valueIncrease() {
     if (states.screenSettings && settings.lcdBacklight) {
         bool process = false;
-        switch (states.screenPage) {
+        switch (settings.screenSett) {
             case SCREEN_SETT_REMOTE_BEEPS:
                 settings.remoteBeeps = !settings.remoteBeeps;
                 process = true;
