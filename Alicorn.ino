@@ -7,7 +7,6 @@
 #include <IRremoteESP8266.h>
 #include <SFE_BMP180.h>
 #include <RtcDS3231.h>
-//#include <MQ135.h>
 
 #include "wifi.h"
 #include "vpid.h"
@@ -17,7 +16,6 @@ extern "C" {
 }
 
 // Pins
-//#define PIN_BUTTON_FACTORY 0
 #define PIN_RELAY_GEIG     0
 #define PIN_DHT            12
 #define PIN_GEIGER         13
@@ -25,7 +23,6 @@ extern "C" {
 #define PIN_BUZZER         15
 #define PIN_RELAY_GAS      16
 #define PIN_MQ             A0
-//#define PIN_LED            3
 
 // I2C Addresses
 #define I2C_LCD 0x27
@@ -134,19 +131,15 @@ DHT dht(PIN_DHT, DHT22);
 #define ALTITUDE 123
 SFE_BMP180 bmp;
 
-// MQ135
-//MQ135 mq(PIN_MQ);
-
 // RTC
-RtcDS3231<TwoWire> rtc(Wire);
-RtcDateTime now;
-
 #define DATETIME_HOURS   0
 #define DATETIME_MINUTES 1
 #define DATETIME_SECONDS 2
 #define DATETIME_YEAR    3
 #define DATETIME_MONTH   4
 #define DATETIME_DAY     5
+RtcDS3231<TwoWire> rtc(Wire);
+RtcDateTime now;
 
 // Geiger
 #define DOSE_MULTI 0.0057
@@ -256,7 +249,6 @@ struct AVERAGE {
 int averageCount;
 
 // Utilities
-//void factoryReset();
 void resetLCD();
 void setRelays();
 void drawScreen(String top, String bot);
@@ -315,16 +307,6 @@ void beepRemote();
 /* ===========
  *  Utilities 
  * =========== */
-
-/*
-void factoryReset() {
-    Serial.println("Factory reset initiated. Restarting...");
-    EEPROM.begin(512);
-    EEPROM.write(EEPROM_SAVED, 0);
-    EEPROM.end();
-    ESP.restart();
-}
-*/
 
 void resetLCD() {
     pullVariPass();
@@ -523,10 +505,8 @@ void setupDevices() {
     bmp.begin();
     irrecv.enableIRIn();
         
-    //attachInterrupt(digitalPinToInterrupt(PIN_BUTTON_FACTORY), factoryReset, FALLING);
     pinMode(PIN_RELAY_GEIG, OUTPUT);
     pinMode(PIN_RELAY_GAS,  OUTPUT);
-
     
     pinMode(PIN_GEIGER, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(PIN_GEIGER), geigerClick, CHANGE);
@@ -612,13 +592,6 @@ void connectWiFi() {
 
     if (settings.wifi < COUNT_WIFI)
         WiFi.begin(ssid[settings.wifi], pass[settings.wifi]);
-    /*
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("\nConnected to WiFi: '" + (String) ssid[settings.wifi] + "' With IP: " + WiFi.localIP());  
-    */
 }
 
 /* ===========
@@ -650,7 +623,6 @@ void processTimer(void *pArg) {
 }
 
 void processAlarm(void *pArg) {
-    //Serial.println("Timer tick!");
     if (settings.geigerAlarm && states.alarm) {
         if (states.alarmOn) {
             noTone(PIN_BUZZER); 
@@ -701,7 +673,6 @@ void processRemote() {
                             } 
                             
                             resetLCD();
-                            // Serial.println("Settings pressed, now set to " + String(states.screenSettings));
                         }
                         break;
 
@@ -745,7 +716,6 @@ void processSensors() {
         averageCount++;
         
         float value;
-        // Serial.println("Measure interval!");
         value = dht.readTemperature();
         if (String(value) != "nan") {
             data.temperature     = value; 
@@ -780,15 +750,11 @@ void processSensors() {
             }
         }
 
-        //value = mq.getCorrectedPPM(data.temperature, data.humidity);
         value = 0;
         if (settings.gasSensor)
             value = ((1023 - (float) analogRead(PIN_MQ)) / 1023) * 100;
         data.gas     = value;
         average.gas += value; 
-        
-        //Serial.println("Temperature: " + String(data.temperature)); 
-        //Serial.println("Humidity:    " + String(data.humidity)); 
     }
 }
 
@@ -823,8 +789,6 @@ void processClock() {
 void processPush() {
     if (intervals.push) {
         intervals.push = false;
-        
-        // Serial.println("Push interval!");
         pushVariPass();
     }
 }
@@ -832,8 +796,6 @@ void processPush() {
 void processPull() {
     if (intervals.pull) {
         intervals.pull = false;
-        
-        // Serial.println("Pull interval!");
         pullVariPass();
     }
 }
@@ -1141,7 +1103,6 @@ void screenPrev() {
         }
         saveSettings();
         resetLCD();
-        // Serial.println("Prev, screen set to " + String(states.screenPage));
     }
 }
 
@@ -1161,7 +1122,6 @@ void screenNext() {
         } 
         saveSettings();
         resetLCD();
-        // Serial.println("Next, screen set to " + String(states.screenPage));
     }
 }
 
@@ -1177,7 +1137,6 @@ void screenSet(int page) {
         } 
         saveSettings();
         resetLCD();
-        // Serial.println("Screen set to " + String(states.screenPage));
     }
 }
 
@@ -1424,52 +1383,6 @@ void loop() {
         processClock();
         processLCD();        
     }
-
-    /*
-    int button = digitalRead(BUTTON_PIN);
-    if (button == HIGH) {
-        //Serial.println("Button: false"); 
-        varipassWriteBool(KEY, ID_LAMP, false, &result);
-    }
-    else {
-        //Serial.println("Button: true"); 
-        varipassWriteBool(KEY, ID_LAMP, true, &result);
-    }
-
-    String bulletin = varipassReadString(KEY, ID_BULL, &result);
-    if (result == VARIPASS_RESULT_SUCCESS) {
-        //Serial.println("Read bulletin: " + bulletin);
-        lcd.clear();
-        lcd.home();
-        lcd.setCursor(0,0); 
-        lcd.print(bulletin);
-        
-        if (bulletin.length() > 16) { 
-            lcd.setCursor(0,1); 
-            lcd.print(bulletin.substring(16));
-        }
-    }
-    else {
-        Serial.println("An error has occured! Code: " + String(result)); 
-    }
-
-    long intensity = varipassReadInt(KEY, ID_INTE, &result);
-    if (result == VARIPASS_RESULT_SUCCESS) {
-        bool lever = varipassReadBool(KEY, ID_LEVR, &result);
-        if (result == VARIPASS_RESULT_SUCCESS) {
-            if (lever) {
-                int output = map(intensity, 0, 100, 0, 255);
-                analogWrite(PIN_LED, output);
-            }
-            else {
-                analogWrite(PIN_LED, 0);
-            }
-        }
-    }
-    else {
-        Serial.println("An error has occured! Code: " + String(result)); 
-    }
-    */
           
     delay(INTERVAL_CYCLE);
 }
