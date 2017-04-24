@@ -106,8 +106,7 @@ extern "C" {
 #define SCREEN_SETT_INT_PULL         7
 #define SCREEN_SETT_INT_SYNC         8
 #define SCREEN_SETT_WIFI             9
-#define SCREEN_SETT_TIME             10
-
+#define SCREEN_SETT_DATETIME         10
 
 // Intervals
 #define INTERVAL_CYCLE  100
@@ -141,6 +140,13 @@ SFE_BMP180 bmp;
 // RTC
 RtcDS3231<TwoWire> rtc(Wire);
 RtcDateTime now;
+
+#define DATETIME_HOURS   0
+#define DATETIME_MINUTES 1
+#define DATETIME_SECONDS 2
+#define DATETIME_YEAR    3
+#define DATETIME_MONTH   4
+#define DATETIME_DAY     5
 
 // Geiger
 #define DOSE_MULTI 0.0057
@@ -203,6 +209,7 @@ struct STATES {
     bool alarm;
     bool alarmOn;
     bool pushSync;
+    int  datePage;
     int  wifi;
 } states;
 
@@ -492,6 +499,7 @@ void setupStates() {
     states.screenSettings = false;
     states.alarm          = false;
     states.alarmOn        = false;
+    states.datePage       = 0;
     states.wifi           = settings.wifi;
 }
 
@@ -697,6 +705,17 @@ void processRemote() {
                         }
                         break;
 
+                    case IR_DATETIME:
+                        if (settings.lcdBacklight && states.screenSettings && settings.screenSett == SCREEN_SETT_DATETIME) {
+                            if (states.datePage >= 5)
+                                states.datePage = 0;
+                            else    
+                                states.datePage++;      
+                            resetLCD();
+                        }
+                        break;
+                            
+
                     case IR_PREV:     screenPrev();    break;
                     case IR_NEXT:     screenNext();    break;
                     case IR_S0:       screenSet(0);    break;    
@@ -897,12 +916,43 @@ void processLCD() {
                     );  
                     break;                  
                 }                
-                case SCREEN_SETT_TIME:
+                case SCREEN_SETT_DATETIME: {
+                    String title = "> Date and Time";
+                    String value = "";
+                    char shortString[3];
+                    char longString[5];
+                    switch (states.datePage) {
+                        case DATETIME_HOURS:
+                            snprintf_P(shortString, 3, PSTR("%02u"), now.Hour());
+                            value = "Hours:   " + String(shortString);
+                            break;
+                        case DATETIME_MINUTES:
+                            snprintf_P(shortString, 3, PSTR("%02u"), now.Minute());
+                            value = "Minutes: " + String(shortString);
+                            break;
+                        case DATETIME_SECONDS:
+                            snprintf_P(shortString, 3, PSTR("%02u"), now.Second());
+                            value = "Seconds: " + String(shortString);
+                            break;
+                        case DATETIME_YEAR:
+                            snprintf_P(longString, 5, PSTR("%02u"), now.Year());
+                            value = "Year:    " + String(longString);
+                            break;
+                        case DATETIME_MONTH:
+                            snprintf_P(shortString, 3, PSTR("%02u"), now.Month());
+                            value = "Month:   " + String(shortString);
+                            break;
+                        case DATETIME_DAY:
+                            snprintf_P(shortString, 3, PSTR("%02u"), now.Day());
+                            value = "Day:     " + String(shortString);
+                            break;
+                    }
                     drawScreen(
-                        "> Date and Time", 
-                        ""
+                        title, 
+                        value
                     );
                     break;
+                }
             }
         } 
         else {
@@ -983,7 +1033,7 @@ void processLCD() {
                         wifi
                     ); 
                     break;
-                }                    
+                }
             }
         } 
     }
@@ -1190,7 +1240,38 @@ void valueDecrease() {
                 else    
                     settings.wifi--;
                 process = true;
+                break;                
+            case SCREEN_SETT_DATETIME: {
+                RtcDateTime newTime;
+                switch (states.datePage) {
+                    case DATETIME_HOURS:
+                        newTime = now - 1 * 60 * 60;
+                        break;
+                    case DATETIME_MINUTES:
+                        newTime = now - 1 * 60;
+                        break;
+                    case DATETIME_SECONDS:
+                        newTime = now - 1;
+                        break;
+                    case DATETIME_YEAR:
+                        if (now.Year() > 1970)
+                            newTime = RtcDateTime(now.Year() - 1, now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second());
+                        break;
+                    case DATETIME_MONTH:
+                        if (now.Month() > 1)
+                            newTime = RtcDateTime(now.Year(), now.Month() - 1, now.Day(), now.Hour(), now.Minute(), now.Second());
+                        else    
+                            newTime = RtcDateTime(now.Year() - 1, 12, now.Day(), now.Hour(), now.Minute(), now.Second());
+                        break;
+                    case DATETIME_DAY:
+                        newTime = now - 1 * 60 * 60 * 24;
+                        break;
+                }
+                rtc.SetDateTime(newTime);
+                now = rtc.GetDateTime();
+                resetLCD();
                 break;
+            }                    
         }
         if (process) {
             resetLCD();
@@ -1258,7 +1339,38 @@ void valueIncrease() {
                 else    
                     settings.wifi++;
                 process = true;
+                break;      
+            case SCREEN_SETT_DATETIME: {
+                RtcDateTime newTime;
+                switch (states.datePage) {
+                    case DATETIME_HOURS:
+                        newTime = now + 1 * 60 * 60;
+                        break;
+                    case DATETIME_MINUTES:
+                        newTime = now + 1 * 60;
+                        break;
+                    case DATETIME_SECONDS:
+                        newTime = now + 1;
+                        break;
+                    case DATETIME_YEAR:
+                        if (now.Year() < 2100)
+                            newTime = RtcDateTime(now.Year() + 1, now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second());
+                        break;
+                    case DATETIME_MONTH:
+                        if (now.Month() < 12)
+                            newTime = RtcDateTime(now.Year(), now.Month() + 1, now.Day(), now.Hour(), now.Minute(), now.Second());
+                        else    
+                            newTime = RtcDateTime(now.Year() + 1, 1, now.Day(), now.Hour(), now.Minute(), now.Second());
+                        break;
+                    case DATETIME_DAY:
+                        newTime = now + 1 * 60 * 60 * 24;
+                        break;
+                }
+                rtc.SetDateTime(newTime);
+                now = rtc.GetDateTime();
+                resetLCD();
                 break;
+            }   
         }
         if (process) {
             resetLCD();
