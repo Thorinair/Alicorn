@@ -6,6 +6,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <IRremoteESP8266.h>
 #include <SFE_BMP180.h>
+#include <RtcDS3231.h>
 //#include <MQ135.h>
 
 #include "wifi.h"
@@ -138,6 +139,8 @@ SFE_BMP180 bmp;
 //MQ135 mq(PIN_MQ);
 
 // RTC
+RtcDS3231<TwoWire> rtc(Wire);
+RtcDateTime now;
 
 // Geiger
 #define DOSE_MULTI 0.0057
@@ -524,7 +527,21 @@ void setupDevices() {
 }
 
 void setupClock() {
+    rtc.Begin();
     
+    if (!rtc.IsDateTimeValid()) {
+        RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
+        Serial.println("RTC lost confidence in the DateTime!");
+        rtc.SetDateTime(compiled);
+    }
+
+    if (!rtc.GetIsRunning()) {
+        Serial.println("RTC was not actively running, starting now");
+        rtc.SetIsRunning(true);
+    }
+    
+    rtc.Enable32kHzPin(false);
+    rtc.SetSquareWavePin(DS3231SquareWavePin_ModeNone); 
 }
 
 void setupTimer() {
@@ -777,7 +794,10 @@ void processGeiger() {
 void processClock() {
     if (intervals.cclock) {
         intervals.cclock = false;
-        
+
+        if (!rtc.IsDateTimeValid())
+            Serial.println("RTC lost confidence in the DateTime!");
+        now = rtc.GetDateTime();  
     }
 }
 
@@ -888,9 +908,14 @@ void processLCD() {
         else {
             switch (settings.screenMain) {
                 case SCREEN_MAIN_TIME:
+                    char timeString[6];
+                    char dateString[11];
+                    snprintf_P(timeString, 6, PSTR("%02u:%02u"), now.Hour(), now.Minute());
+                    snprintf_P(dateString, 11, PSTR("%04u-%02u-%02u"), now.Year(), now.Month(), now.Day());
+                    
                     drawScreen(
-                        "     00:00      ", 
-                        "  05 Apr 2017   "
+                        "     " + String(timeString), 
+                        "   " + String(dateString)
                     );
                     break;
                 case SCREEN_MAIN_DHT:
@@ -1264,6 +1289,7 @@ void setup() {
     setupCounters();
     setupWiFi();
     setupDevices(); 
+    setupClock();
     resetAverage();
     
     drawScreen(" == Alicorn ==", "  Connecting...");
