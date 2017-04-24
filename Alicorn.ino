@@ -721,11 +721,19 @@ void processSensors() {
             data.temperature     = value; 
             average.temperature += value;           
         }
+        else {
+            Serial.println("Error reading Temperature.");
+            average.temperature += data.temperature; 
+        }
             
         value = dht.readHumidity();
         if (String(value) != "nan") {
             data.humidity     = value;
             average.humidity += value;            
+        }
+        else {
+            Serial.println("Error reading Humidity.");
+            average.humidity += data.humidity;  
         }
 
         char stat;
@@ -1060,10 +1068,7 @@ void syncVariPass() {
         if (states.pushSync) {
             Serial.println("Syncing data to VariPass...");
             varipassWriteBool(KEY1, ID_TGL_CLICKS, settings.geigerClicks, &result);
-            if (result == VARIPASS_RESULT_SUCCESS)
-                states.pushSync = false;
-            else
-                Serial.println("An error has occured! Code: " + String(result));    
+            states.pushSync = false;
         }
         else {
             bool value;                
