@@ -1354,7 +1354,8 @@ void setup() {
     lcd.init();
     lcd.setBacklight(true);
     
-    drawScreen(" == Alicorn ==", "  Loading...");
+    drawScreen(" == Alicorn ==", "  Starting...");
+    
     setupSettings();
     setupStates();
     setupCounters();
@@ -1362,11 +1363,9 @@ void setup() {
     setupDevices(); 
     setupClock();
     resetAverage();
-    
-    drawScreen(" == Alicorn ==", "  Connecting...");
     connectWiFi();
     
-    drawScreen(" == Alicorn ==", "  Ready!");
+    drawScreen("", "");
 
     setupTimer();
 }
