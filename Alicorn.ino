@@ -33,6 +33,8 @@ extern "C" {
 
 // Default Settings
 #define DEFAULT_LCD_BACKLIGHT    1
+#define DEFAULT_SCREEN_MAIN      0
+#define DEFAULT_SCREEN_SETT      0
 #define DEFAULT_REMOTE_BEEPS     1
 #define DEFAULT_GAS_SENSOR       1
 #define DEFAULT_GEIG_CLICKS      1
@@ -41,44 +43,47 @@ extern "C" {
 #define DEFAULT_INT_MEASURE      10000
 #define DEFAULT_INT_PUSH         60000
 #define DEFAULT_INT_PULL         1000
+#define DEFAULT_INT_SYNC         1000
 #define DEFAULT_WIFI             0
-#define DEFAULT_SCREEN_MAIN      0
-#define DEFAULT_SCREEN_SETT      0
 
 // MinMaxStep Settings
 #define MIN_GEIG_SENSITIVITY 100
 #define MIN_INT_MEASURE      2000
 #define MIN_INT_PUSH         1000
 #define MIN_INT_PULL         1000
+#define MIN_INT_SYNC         1000
 
 #define MAX_GEIG_SENSITIVITY 10000
 #define MAX_INT_MEASURE      60000
 #define MAX_INT_PUSH         60000
 #define MAX_INT_PULL         60000
+#define MAX_INT_SYNC         60000
 
 #define STP_GEIG_SENSITIVITY 100
 #define STP_INT_MEASURE      1000
 #define STP_INT_PUSH         1000
 #define STP_INT_PULL         1000
+#define STP_INT_SYNC         1000
 
 // EEPROM Addresses
 #define EEPROM_SAVED            0
 #define EEPROM_LCD_BACKLIGHT    1
-#define EEPROM_REMOTE_BEEPS     2
-#define EEPROM_GAS_SENSOR       3
-#define EEPROM_GEIG_CLICKS      4
-#define EEPROM_GEIG_ALARM       5
-#define EEPROM_GEIG_SENSITIVITY 6
-#define EEPROM_INT_MEASURE      7
-#define EEPROM_INT_PUSH         8
-#define EEPROM_INT_PULL         9
-#define EEPROM_WIFI             10
-#define EEPROM_SCREEN_MAIN      11
-#define EEPROM_SCREEN_SETT      12
+#define EEPROM_SCREEN_MAIN      2
+#define EEPROM_SCREEN_SETT      3
+#define EEPROM_REMOTE_BEEPS     4
+#define EEPROM_GAS_SENSOR       5
+#define EEPROM_GEIG_CLICKS      6
+#define EEPROM_GEIG_ALARM       7
+#define EEPROM_GEIG_SENSITIVITY 8
+#define EEPROM_INT_MEASURE      9
+#define EEPROM_INT_PUSH         10
+#define EEPROM_INT_PULL         11
+#define EEPROM_INT_SYNC         12
+#define EEPROM_WIFI             13
 
 // Screens
 #define SCREENS_MAIN 7
-#define SCREENS_SETT 10
+#define SCREENS_SETT 11
 
 // Main Screens
 #define SCREEN_MAIN_TIME      0
@@ -98,8 +103,9 @@ extern "C" {
 #define SCREEN_SETT_INT_MEASURE      5
 #define SCREEN_SETT_INT_PUSH         6
 #define SCREEN_SETT_INT_PULL         7
-#define SCREEN_SETT_WIFI             8
-#define SCREEN_SETT_TIME             9
+#define SCREEN_SETT_INT_SYNC         8
+#define SCREEN_SETT_WIFI             9
+#define SCREEN_SETT_TIME             10
 
 
 // Intervals
@@ -174,6 +180,8 @@ os_timer_t timerAlarm;
 // Structures
 struct SETTINGS {
     bool lcdBacklight;
+    int  screenMain;
+    int  screenSett;
     bool remoteBeeps;
     bool gasSensor;
     bool geigerClicks;
@@ -183,15 +191,15 @@ struct SETTINGS {
     long intervalGeiger;
     int  intervalPush;
     int  intervalPull;
+    int  intervalSync;
     int  wifi;
-    int  screenMain;
-    int  screenSett;
 } settings;
 
 struct STATES {
     bool screenSettings;
     bool alarm;
     bool alarmOn;
+    bool pushSync;
     int  wifi;
 } states;
 
@@ -201,6 +209,7 @@ struct COUNTERS {
     int cclock;
     int push;
     int pull;
+    int sync;
     int lcd;
 } counters;
 
@@ -210,6 +219,7 @@ struct INTERVALS {
     bool cclock;
     bool push;
     bool pull;
+    bool sync;
     bool lcd;
 } intervals;
 
@@ -274,11 +284,13 @@ void processGeiger();
 void processClock();
 void processPush();
 void processPull();
+void processSync();
 void processLCD();
 
 // VariPass
 void pullVariPass();
 void pushVariPass();
+void syncVariPass();
 
 // Remote
 void screenPrev();
@@ -453,6 +465,8 @@ void setupSettings() {
     }
     else {       
         settings.lcdBacklight      = DEFAULT_LCD_BACKLIGHT;
+        settings.screenMain        = DEFAULT_SCREEN_MAIN;
+        settings.screenSett        = DEFAULT_SCREEN_SETT;
         settings.remoteBeeps       = DEFAULT_REMOTE_BEEPS;
         settings.gasSensor         = DEFAULT_GAS_SENSOR;
         settings.geigerClicks      = DEFAULT_GEIG_CLICKS;
@@ -461,9 +475,8 @@ void setupSettings() {
         settings.intervalMeasure   = DEFAULT_INT_MEASURE;
         settings.intervalPush      = DEFAULT_INT_PUSH;
         settings.intervalPull      = DEFAULT_INT_PULL;
+        settings.intervalSync      = DEFAULT_INT_SYNC;
         settings.wifi              = DEFAULT_WIFI;
-        settings.screenMain        = DEFAULT_SCREEN_MAIN;
-        settings.screenSett        = DEFAULT_SCREEN_SETT;
         
         Serial.println("\nCreated new settings. Saving...");
         saveSettings();
@@ -483,6 +496,7 @@ void setupCounters() {
     counters.measure = 0;
     counters.push    = 0;
     counters.pull    = 0;
+    counters.sync    = 0;
 }
 
 void setupWiFi() {
@@ -528,6 +542,8 @@ void saveSettings() {
     EEPROM.begin(512);
     EEPROM.write(EEPROM_SAVED,            1);
     EEPROM.write(EEPROM_LCD_BACKLIGHT,    settings.lcdBacklight);
+    EEPROM.write(EEPROM_SCREEN_MAIN,      settings.screenMain);
+    EEPROM.write(EEPROM_SCREEN_SETT,      settings.screenSett);
     EEPROM.write(EEPROM_REMOTE_BEEPS,     settings.remoteBeeps);
     EEPROM.write(EEPROM_GAS_SENSOR,       settings.gasSensor);
     EEPROM.write(EEPROM_GEIG_CLICKS,      settings.geigerClicks);
@@ -536,9 +552,8 @@ void saveSettings() {
     EEPROM.write(EEPROM_INT_MEASURE,      settings.intervalMeasure   / 1000);
     EEPROM.write(EEPROM_INT_PUSH,         settings.intervalPush      / 1000);
     EEPROM.write(EEPROM_INT_PULL,         settings.intervalPull      / 1000);
+    EEPROM.write(EEPROM_INT_SYNC,         settings.intervalSync      / 1000);
     EEPROM.write(EEPROM_WIFI,             settings.wifi);
-    EEPROM.write(EEPROM_SCREEN_MAIN,      settings.screenMain);
-    EEPROM.write(EEPROM_SCREEN_SETT,      settings.screenSett);
     EEPROM.end();
     Serial.println("Saved settings to EEPROM.");
 }
@@ -546,6 +561,8 @@ void saveSettings() {
 void loadSettings() {
     EEPROM.begin(512);
     settings.lcdBacklight      = (bool) EEPROM.read(EEPROM_LCD_BACKLIGHT);
+    settings.screenMain        = (int)  EEPROM.read(EEPROM_SCREEN_MAIN);
+    settings.screenSett        = (int)  EEPROM.read(EEPROM_SCREEN_SETT);
     settings.remoteBeeps       = (bool) EEPROM.read(EEPROM_REMOTE_BEEPS);
     settings.gasSensor         = (bool) EEPROM.read(EEPROM_GAS_SENSOR);
     settings.geigerClicks      = (bool) EEPROM.read(EEPROM_GEIG_CLICKS);
@@ -554,9 +571,8 @@ void loadSettings() {
     settings.intervalMeasure   = (int)  EEPROM.read(EEPROM_INT_MEASURE)      * 1000;
     settings.intervalPush      = (int)  EEPROM.read(EEPROM_INT_PUSH)         * 1000;
     settings.intervalPull      = (int)  EEPROM.read(EEPROM_INT_PULL)         * 1000;
+    settings.intervalSync      = (int)  EEPROM.read(EEPROM_INT_SYNC)         * 1000;
     settings.wifi              = (int)  EEPROM.read(EEPROM_WIFI);
-    settings.screenMain        = (int)  EEPROM.read(EEPROM_SCREEN_MAIN);
-    settings.screenSett        = (int)  EEPROM.read(EEPROM_SCREEN_SETT);
     EEPROM.end();
     Serial.println("Loaded settings from EEPROM.");
 }
@@ -600,6 +616,9 @@ void processTimer(void *pArg) {
         
     if (checkInterval(&counters.pull,    settings.intervalPush))
         intervals.pull    = true;
+        
+    if (checkInterval(&counters.sync,    settings.intervalSync))
+        intervals.sync    = true;
 
     if (checkInterval(&counters.lcd,     INTERVAL_LCD))
         intervals.lcd     = true;            
@@ -673,7 +692,7 @@ void processRemote() {
                     case IR_S7:       screenSet(7);    break;    
                     case IR_S8:       screenSet(8);    break;    
                     case IR_S9:       screenSet(9);    break; 
-                    //case IR_S10:      screenSet(10);   break;
+                    case IR_S10:      screenSet(10);   break;
                     //case IR_S11:      screenSet(11);   break;
                     case IR_DECREASE: valueDecrease(); break;
                     case IR_INCREASE: valueIncrease(); break;                            
@@ -780,6 +799,13 @@ void processPull() {
     }
 }
 
+void processSync() {
+    if (intervals.sync) {
+        intervals.sync = false;
+        syncVariPass();
+    }
+}
+
 void processLCD() {
     if (intervals.lcd) {
         intervals.lcd = false;
@@ -832,6 +858,12 @@ void processLCD() {
                     drawScreen(
                         "> Pulling Inter.", 
                         "Value: " + String(settings.intervalPull / 1000) + " s"
+                    );
+                    break;
+                case SCREEN_SETT_INT_SYNC:
+                    drawScreen(
+                        "> Syncing Inter.", 
+                        "Value: " + String(settings.intervalSync / 1000) + " s"
                     );
                     break;
                 case SCREEN_SETT_WIFI: {
@@ -984,6 +1016,36 @@ void pushVariPass() {
     resetAverage();
 }
 
+void syncVariPass() {
+    if (WiFi.status() == WL_CONNECTED) {
+        int result;
+
+        if (states.pushSync) {
+            Serial.println("Syncing data to VariPass...");
+            varipassWriteBool(KEY1, ID_TGL_CLICKS, settings.geigerClicks, &result);
+            if (result == VARIPASS_RESULT_SUCCESS)
+                states.pushSync = false;
+            else
+                Serial.println("An error has occured! Code: " + String(result));    
+        }
+        else {
+            bool value;                
+            value = varipassReadBool(KEY1, ID_TGL_CLICKS, &result);
+            if (result == VARIPASS_RESULT_SUCCESS) {
+                if (value != settings.geigerClicks) {
+                    settings.geigerClicks = value;
+                    setRelays();
+                    saveSettings();
+                    counters.lcd = 0;
+                }                
+            }
+            else {
+                Serial.println("An error has occured! Code: " + String(result));                   
+            }  
+        }
+    }
+}
+
 /* ========
  *  Remote
  * ======== */
@@ -1060,6 +1122,7 @@ void valueDecrease() {
             case SCREEN_SETT_GEIG_CLICKS:
                 settings.geigerClicks = !settings.geigerClicks;
                 setRelays();
+                states.pushSync = true;
                 process = true;
                 break;
             case SCREEN_SETT_GEIG_ALARM:
@@ -1088,6 +1151,12 @@ void valueDecrease() {
                 settings.intervalPull -= STP_INT_PULL;
                 if (settings.intervalPull < MIN_INT_PULL)
                     settings.intervalPull = MIN_INT_PULL;
+                process = true;
+                break;
+            case SCREEN_SETT_INT_SYNC:
+                settings.intervalSync -= STP_INT_SYNC;
+                if (settings.intervalSync < MIN_INT_SYNC)
+                    settings.intervalSync = MIN_INT_SYNC;
                 process = true;
                 break;
             case SCREEN_SETT_WIFI:
@@ -1121,6 +1190,7 @@ void valueIncrease() {
             case SCREEN_SETT_GEIG_CLICKS:
                 settings.geigerClicks = !settings.geigerClicks;
                 setRelays();
+                states.pushSync = true;
                 process = true;
                 break;
             case SCREEN_SETT_GEIG_ALARM:
@@ -1149,6 +1219,12 @@ void valueIncrease() {
                 settings.intervalPull += STP_INT_PULL;
                 if (settings.intervalPull > MAX_INT_PULL)
                     settings.intervalPull = MAX_INT_PULL;
+                process = true;
+                break;
+            case SCREEN_SETT_INT_SYNC:
+                settings.intervalSync += STP_INT_SYNC;
+                if (settings.intervalSync > MAX_INT_SYNC)
+                    settings.intervalSync = MAX_INT_SYNC;
                 process = true;
                 break;
             case SCREEN_SETT_WIFI:
@@ -1203,6 +1279,7 @@ void loop() {
     processRemote();
     processSensors();
     processGeiger();
+    processSync();
     processPush();
     if (settings.lcdBacklight) {
         processPull();
