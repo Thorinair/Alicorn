@@ -719,26 +719,28 @@ void processSensors() {
     if (intervals.measure) {
         intervals.measure = false;
         
-        float value;
-        value = dht.readTemperature();
-        if (String(value) != "nan") {
-            data.temperature     = value; 
-            average.temperature += value;  
-            average.temperatureCount++;         
+        float readValue;
+        readValue = dht.readTemperature();
+        if (String(readValue) != "nan") {
+            data.temperature     = readValue; 
+            average.temperature += readValue;         
         }
         else {
             Serial.println("Error reading Temperature.");
+            average.temperature += data.temperature;   
         }
+        average.temperatureCount++;  
             
-        value = dht.readHumidity();
-        if (String(value) != "nan") {
-            data.humidity     = value;
-            average.humidity += value;  
-            average.humidityCount++;                
+        readValue = dht.readHumidity();
+        if (String(readValue) != "nan") {
+            data.humidity     = readValue;
+            average.humidity += readValue;                 
         }
         else {
             Serial.println("Error reading Humidity.");
+            average.humidity += data.humidity; 
         }
+        average.humidityCount++; 
 
         char stat;
         double temp, pres,p0,a;        
@@ -753,20 +755,19 @@ void processSensors() {
                     delay(stat);                    
                     stat = bmp.getPressure(pres, temp);
                     if (stat != 0) {                    
-                        value = (float) bmp.sealevel(pres, ALTITUDE);
-                        if (String(value) != "nan")
-                            data.pressure     = value;
-                            average.pressure += value; 
-                            average.pressureCount++; 
+                        readValue = (float) bmp.sealevel(pres, ALTITUDE);
+                        data.pressure     = readValue;
+                        average.pressure += readValue; 
+                        average.pressureCount++; 
                     }
                 }
             }
         }
 
         if (settings.gasSensor) {
-            value = ((1023 - (float) analogRead(PIN_MQ)) / 1023) * 100;
-            data.gas     = value;
-            average.gas += value; 
+            readValue = ((1023 - (float) analogRead(PIN_MQ)) / 1023) * 100;
+            data.gas     = readValue;
+            average.gas += readValue; 
             average.gasCount++; 
         }
     }
