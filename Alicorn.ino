@@ -122,7 +122,7 @@ extern "C" {
 // Buzzer
 #define BUZZER_REMOTE_TONE     3000
 #define BUZZER_REMOTE_DURATION 100
-#define BUZZER_ALARM_TONE      2000
+#define BUZZER_ALARM_TONE      4000
 
 // DHT22
 DHT dht(PIN_DHT, DHT22);
