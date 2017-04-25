@@ -241,12 +241,14 @@ struct DATA {
 
 struct AVERAGE {
     float  temperature;
+    int    temperatureCount;
     float  humidity;
+    int    humidityCount;
     float  pressure;
+    int    pressureCount;
     float  gas;
+    int    gasCount;
 } average;
-
-int averageCount;
 
 // Utilities
 void resetLCD();
@@ -351,7 +353,10 @@ void resetAverage() {
     average.pressure    = 0;
     average.gas         = 0;
     
-    averageCount        = 0;
+    average.temperatureCount = 0;
+    average.humidityCount    = 0;
+    average.pressureCount    = 0;
+    average.gasCount         = 0;
 }
 
 void geigerClick() {
@@ -713,27 +718,26 @@ void processRemote() {
 void processSensors() {
     if (intervals.measure) {
         intervals.measure = false;
-        averageCount++;
         
         float value;
         value = dht.readTemperature();
         if (String(value) != "nan") {
             data.temperature     = value; 
-            average.temperature += value;           
+            average.temperature += value;  
+            average.temperatureCount++;         
         }
         else {
             Serial.println("Error reading Temperature.");
-            average.temperature += data.temperature; 
         }
             
         value = dht.readHumidity();
         if (String(value) != "nan") {
             data.humidity     = value;
-            average.humidity += value;            
+            average.humidity += value;  
+            average.humidityCount++;                
         }
         else {
             Serial.println("Error reading Humidity.");
-            average.humidity += data.humidity;  
         }
 
         char stat;
@@ -753,16 +757,18 @@ void processSensors() {
                         if (String(value) != "nan")
                             data.pressure     = value;
                             average.pressure += value; 
+                            average.pressureCount++; 
                     }
                 }
             }
         }
 
-        value = 0;
-        if (settings.gasSensor)
+        if (settings.gasSensor) {
             value = ((1023 - (float) analogRead(PIN_MQ)) / 1023) * 100;
-        data.gas     = value;
-        average.gas += value; 
+            data.gas     = value;
+            average.gas += value; 
+            average.gasCount++; 
+        }
     }
 }
 
@@ -1050,11 +1056,11 @@ void pullVariPass() {
 void pushVariPass() {
     if (WiFi.status() == WL_CONNECTED) {
         int result;
-        varipassWriteFloat(KEY1, ID_TEMPERATURE, average.temperature / averageCount, &result);
-        varipassWriteFloat(KEY1, ID_HUMIDITY,    average.humidity    / averageCount, &result);
-        varipassWriteFloat(KEY1, ID_PRESSURE,    average.pressure    / averageCount, &result);
+        varipassWriteFloat(KEY1, ID_TEMPERATURE, average.temperature / average.temperatureCount, &result);
+        varipassWriteFloat(KEY1, ID_HUMIDITY,    average.humidity    / average.humidityCount,    &result);
+        varipassWriteFloat(KEY1, ID_PRESSURE,    average.pressure    / average.pressureCount,    &result);
         if (settings.gasSensor)
-            varipassWriteFloat(KEY1, ID_GAS,     average.gas         / averageCount, &result);
+            varipassWriteFloat(KEY1, ID_GAS,     average.gas         / average.gasCount,         &result);
         varipassWriteInt  (KEY1, ID_CPM,  data.cpm,  &result);
         varipassWriteFloat(KEY1, ID_DOSE, data.dose, &result);
     }
