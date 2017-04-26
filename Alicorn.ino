@@ -617,7 +617,7 @@ void processTimer(void *pArg) {
     if (checkInterval(&counters.push,    settings.intervalPush))
         intervals.push    = true;
         
-    if (checkInterval(&counters.pull,    settings.intervalPush))
+    if (checkInterval(&counters.pull,    settings.intervalPull))
         intervals.pull    = true;
         
     if (checkInterval(&counters.sync,    settings.intervalSync))
