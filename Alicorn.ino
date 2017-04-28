@@ -174,6 +174,7 @@ decode_results results;
 char* host;
 char* ssid[COUNT_WIFI];
 char* pass[COUNT_WIFI];
+char* conf[COUNT_WIFI];
 
 // Timers
 os_timer_t timer;
@@ -257,6 +258,7 @@ void drawScreen(String top, String bot);
 bool checkInterval(int *counter, int interval);
 void resetAverage();
 void geigerClick();
+IPAddress getIPFromString(char* addressString, int id);
 
 // String Manipulation
 String formatNumbers(long number, int compact, bool usePrefix, bool useSuffix, String suffix);
@@ -361,6 +363,11 @@ void resetAverage() {
 
 void geigerClick() {
     data.cpmNow++;
+}
+
+IPAddress getIPFromString(char* addressString, int id) {
+    String address = splitData(String(addressString), '|', id);
+    return IPAddress(splitData(address, '.', 0).toInt(), splitData(address, '.', 1).toInt(), splitData(address, '.', 2).toInt(), splitData(address, '.', 3).toInt());
 }
 
 /* =====================
@@ -499,10 +506,18 @@ void setupCounters() {
 
 void setupWiFi() {
     host    = WIFI_HOST;
-    ssid[0] = WIFI_SSID_0;
-    ssid[1] = WIFI_SSID_1;
-    pass[0] = WIFI_PASS_0;
-    pass[1] = WIFI_PASS_1;
+    
+    ssid[0] = WIFI_0_SSID;
+    pass[0] = WIFI_0_PASS;
+    conf[0] = WIFI_0_CONF;
+    
+    ssid[1] = WIFI_1_SSID;
+    pass[1] = WIFI_1_PASS;
+    conf[1] = WIFI_1_CONF;
+    
+    ssid[2] = WIFI_2_SSID;
+    pass[2] = WIFI_2_PASS;
+    conf[2] = WIFI_2_CONF;
 }
 
 void setupDevices() {
@@ -595,8 +610,20 @@ void connectWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.hostname(host);
 
-    if (settings.wifi < COUNT_WIFI)
+    if (settings.wifi < COUNT_WIFI) {
+        if (conf[settings.wifi] != "DHCP") {
+            String address;
+            
+            IPAddress ipLocal =   getIPFromString(conf[settings.wifi], 0);
+            IPAddress ipGateway = getIPFromString(conf[settings.wifi], 1);
+            IPAddress ipSubnet =  getIPFromString(conf[settings.wifi], 2);
+            IPAddress ipDNS1 =    getIPFromString(conf[settings.wifi], 3);
+            IPAddress ipDNS2 =    getIPFromString(conf[settings.wifi], 4);
+
+            WiFi.config(ipLocal, ipGateway, ipSubnet, ipDNS1, ipDNS2);
+        }
         WiFi.begin(ssid[settings.wifi], pass[settings.wifi]);
+    }
 }
 
 /* ===========
