@@ -1031,13 +1031,13 @@ void pullVariPass() {
                 if (result == VARIPASS_RESULT_SUCCESS)
                     data.core = value1;
                 else
-                    Serial.println("An error has occured! Code: " + String(result));
+                    Serial.println("An error has occured reading Core data! " + varipassGetResultDescription(result));
                     
                 value1 = varipassReadInt(KEY2, ID_GAIN, &result);
                 if (result == VARIPASS_RESULT_SUCCESS)
                     data.gain = value1;
                 else
-                    Serial.println("An error has occured! Code: " + String(result)); 
+                    Serial.println("An error has occured reading Gain data! " + varipassGetResultDescription(result)); 
                      
                 break;
                 
@@ -1048,7 +1048,7 @@ void pullVariPass() {
                 if (result == VARIPASS_RESULT_SUCCESS)
                     data.bulletin = value2;
                 else
-                    Serial.println("An error has occured! Code: " + String(result));
+                    Serial.println("An error has occured reading Bulletin data! " + varipassGetResultDescription(result));
                      
                 break;
         }
@@ -1075,7 +1075,10 @@ void syncVariPass() {
         if (states.pushSync) {
             Serial.println("Syncing data to VariPass...");
             varipassWriteBool(KEY1, ID_TGL_CLICKS, settings.geigerClicks, &result);
-            states.pushSync = false;
+            if (result == VARIPASS_RESULT_SUCCESS)
+                states.pushSync = false;
+            else
+                Serial.println("An error has occured writing geiger click settings! " + varipassGetResultDescription(result));
         }
         else {
             bool value;                
@@ -1089,7 +1092,7 @@ void syncVariPass() {
                 }                
             }
             else {
-                Serial.println("An error has occured! Code: " + String(result));                   
+                Serial.println("An error has occured reading geiger click settings! " + varipassGetResultDescription(result));                   
             }  
         }
     }
