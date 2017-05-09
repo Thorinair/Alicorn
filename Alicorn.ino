@@ -7,6 +7,7 @@
 #include <IRremoteESP8266.h>
 #include <SFE_BMP180.h>
 #include <RtcDS3231.h>
+#include <HMC5883L.h>
 
 #include "wifi.h"
 #include "vpid.h"
@@ -80,17 +81,18 @@ extern "C" {
 #define EEPROM_WIFI             13
 
 // Screens
-#define SCREENS_MAIN 7
+#define SCREENS_MAIN 8
 #define SCREENS_SETT 11
 
 // Main Screens
 #define SCREEN_MAIN_TIME      0
 #define SCREEN_MAIN_DHT       1
 #define SCREEN_MAIN_BMPMQ     2
-#define SCREEN_MAIN_GEIGER    3
-#define SCREEN_MAIN_CORE      4
-#define SCREEN_MAIN_BULLETIN  5
-#define SCREEN_MAIN_WIFI      6
+#define SCREEN_MAIN_MAG       3
+#define SCREEN_MAIN_GEIGER    4
+#define SCREEN_MAIN_CORE      5
+#define SCREEN_MAIN_BULLETIN  6
+#define SCREEN_MAIN_WIFI      7
 
 // Settings Screens
 #define SCREEN_SETT_REMOTE_BEEPS     0
@@ -130,6 +132,9 @@ DHT dht(PIN_DHT, DHT22);
 // BMP180
 #define ALTITUDE 123
 SFE_BMP180 bmp;
+
+// HMC5883L
+HMC5883L mag;
 
 // RTC
 #define DATETIME_HOURS   0
@@ -232,6 +237,8 @@ struct DATA {
     float  humidity;
     float  pressure;
     float  gas;
+    float  magnitude;
+    float  inclination;
     int    cpmNow;
     int    cpm;
     float  dose;
@@ -249,6 +256,10 @@ struct AVERAGE {
     int    pressureCount;
     float  gas;
     int    gasCount;
+    float  magnitude;
+    int    magnitudeCount;
+    float  inclination;
+    int    inclinationCount;
 } average;
 
 // Utilities
@@ -354,11 +365,15 @@ void resetAverage() {
     average.humidity    = 0;
     average.pressure    = 0;
     average.gas         = 0;
+    average.magnitude   = 0;
+    average.inclination = 0;
     
     average.temperatureCount = 0;
     average.humidityCount    = 0;
     average.pressureCount    = 0;
     average.gasCount         = 0;
+    average.magnitudeCount   = 0;
+    average.inclinationCount = 0;
 }
 
 void geigerClick() {
@@ -524,6 +539,12 @@ void setupDevices() {
     dht.begin();
     bmp.begin();
     irrecv.enableIRIn();
+
+    mag.begin();
+    mag.setRange(HMC5883L_RANGE_1_3GA);
+    mag.setMeasurementMode(HMC5883L_CONTINOUS);
+    mag.setDataRate(HMC5883L_DATARATE_30HZ);
+    mag.setSamples(HMC5883L_SAMPLES_8);
         
     pinMode(PIN_RELAY_GEIG, OUTPUT);
     pinMode(PIN_RELAY_GAS,  OUTPUT);
@@ -797,6 +818,21 @@ void processSensors() {
             average.gas += readValue; 
             average.gasCount++; 
         }
+
+        Vector raw = mag.readRaw();
+        float magX = (float) raw.XAxis / 10;
+        float magY = (float) raw.YAxis / 10;
+        float magZ = (float) raw.ZAxis / 10;
+        
+        readValue = sqrt(magX * magX + magY * magY + magZ * magZ);
+        data.magnitude     = readValue;
+        average.magnitude += readValue; 
+        average.magnitudeCount++; 
+        
+        readValue = 90 - (acos(magZ / readValue) * (180 / PI));
+        data.inclination     = readValue;
+        average.inclination += readValue; 
+        average.inclinationCount++; 
     }
 }
 
@@ -974,8 +1010,8 @@ void processLCD() {
                     break;
                 case SCREEN_MAIN_DHT:
                     drawScreen(
-                        "Temp: " + String(data.temperature, 1) + " C", 
-                        "Humi: " + String(data.humidity, 1) + " %"
+                        "Tmp: " + String(data.temperature, 1) + " " + (char)223 + "C", 
+                        "Hmi: " + String(data.humidity, 1) + " %"
                     );
                     break;
                 case SCREEN_MAIN_BMPMQ: {
@@ -989,6 +1025,12 @@ void processLCD() {
                     );
                     break;
                 }
+                case SCREEN_MAIN_MAG:
+                    drawScreen(
+                        "Mag: " + String(data.magnitude, 2) + " uT",
+                        "Inc: " + String(data.inclination, 2) + " " + (char)223
+                    );
+                    break;
                 case SCREEN_MAIN_GEIGER:
                     drawScreen(
                         "CPM: " + String(data.cpm) + " [" + String(data.cpmNow) + "]",
@@ -1089,6 +1131,8 @@ void pushVariPass() {
         varipassWriteFloat(KEY1, ID_PRESSURE,    average.pressure    / average.pressureCount,    &result);
         if (settings.gasSensor)
             varipassWriteFloat(KEY1, ID_GAS,     average.gas         / average.gasCount,         &result);
+        varipassWriteFloat(KEY1, ID_MAGNITUDE,   average.magnitude   / average.magnitudeCount,   &result);
+        varipassWriteFloat(KEY1, ID_INCLINATION, average.inclination / average.inclinationCount, &result);
         varipassWriteInt  (KEY1, ID_CPM,  data.cpm,  &result);
         varipassWriteFloat(KEY1, ID_DOSE, data.dose, &result);
     }
