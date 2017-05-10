@@ -331,9 +331,9 @@ void resetLCD() {
 
 void setRelays() {
     if (settings.geigerClicks)
-        digitalWrite(PIN_RELAY_GEIG, HIGH);
-    else
         digitalWrite(PIN_RELAY_GEIG, LOW);
+    else
+        digitalWrite(PIN_RELAY_GEIG, HIGH);
         
     if (settings.gasSensor)
         digitalWrite(PIN_RELAY_GAS, LOW);
