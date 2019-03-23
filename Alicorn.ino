@@ -336,9 +336,9 @@ void setRelays() {
         digitalWrite(PIN_RELAY_GEIG, HIGH);
         
     if (settings.gasSensor)
-        digitalWrite(PIN_RELAY_GAS, LOW);
-    else
         digitalWrite(PIN_RELAY_GAS, HIGH);
+    else
+        digitalWrite(PIN_RELAY_GAS, LOW);
 }
 
 void drawScreen(String top, String bot) {
@@ -1133,8 +1133,6 @@ void pushVariPass() {
             varipassWriteFloat(KEY1, ID_GAS,     average.gas         / average.gasCount,         &result);
         varipassWriteFloat(KEY1, ID_MAGNITUDE,   average.magnitude   / average.magnitudeCount,   &result);
         varipassWriteFloat(KEY1, ID_INCLINATION, average.inclination / average.inclinationCount, &result);
-        varipassWriteInt  (KEY1, ID_CPM,  data.cpm,  &result);
-        varipassWriteFloat(KEY1, ID_DOSE, data.dose, &result);
     }
     resetAverage();
 }
